@@ -10,12 +10,20 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Models\User;
 
 class ProfileController extends Controller
 {
     /**
      * Display the user's profile form.
      */
+
+    public function index(): Response
+    {
+        $users = User::all();
+        return Inertia::render('Profile/List', ['users' => $users]);
+    }
+
     public function edit(Request $request): Response
     {
         return Inertia::render('Profile/Edit', [
@@ -24,18 +32,42 @@ class ProfileController extends Controller
         ]);
     }
 
+    public function show(User $user)
+    {
+        $userFind = User::find($user);
+
+        if (!$userFind) {
+            abort(404);
+        }
+
+        return Inertia::render('Profile/Edit', ['user' => $userFind]);
+    }
+
     /**
      * Update the user's profile information.
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
+        $user = $request->user();
+        $validatedData = $request->validated();
 
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
+        // Update common fields
+        $user->fill([
+            'name' => $validatedData['name'],
+            'email' => $validatedData['email'],
+        ]);
+
+        // Update role if provided
+        if (isset($validatedData['role'])) {
+            $user->role = $validatedData['role'];
         }
 
-        $request->user()->save();
+        // Check and reset email verification if the email is changed
+        if ($user->isDirty('email')) {
+            $user->email_verified_at = null;
+        }
+
+        $user->save();
 
         return Redirect::route('profile.edit');
     }
